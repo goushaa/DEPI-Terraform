@@ -32,8 +32,8 @@ The following AWS resources are created:
    Clone this repository to your local machine:
 
    ```bash
-   git clone <repository_url>
-   cd <repository_directory>
+   git clone https://github.com/goushaa/DEPI-Terraform.git
+   cd DEPI-Terraform
    ```
 
 2. **Initialize Terraform**
