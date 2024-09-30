@@ -47,15 +47,46 @@ resource "aws_route_table_association" "public_rt_association" {
   route_table_id = aws_route_table.public_rt.id
 }
 
+resource "aws_security_group" "instance_sg" {
+  vpc_id = aws_vpc.main_vpc.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] 
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1" 
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "k3s-jenkins-sg"
+  }
+}
+
 variable "ubuntu_ami" {
   default = "ami-0e86e20dae9224db8" # Ubuntu ISO in us-east-1
 }
 
 resource "aws_instance" "k3s" {
-  ami           = var.ubuntu_ami
-  instance_type = "t2.micro" 
-  subnet_id     = aws_subnet.public_subnet.id
+  ami                    = var.ubuntu_ami
+  instance_type         = "t2.micro" 
+  subnet_id             = aws_subnet.public_subnet.id
   associate_public_ip_address = true
+  security_groups       = [aws_security_group.instance_sg.id]
+  user_data = <<-EOF
+                #!/bin/bash
+                apt update
+                apt install -y curl
+                curl -sfL https://get.k3s.io | sh -
+                chmod 644 /etc/rancher/k3s/k3s.yaml
+                chown ubuntu:ubuntu /etc/rancher/k3s/k3s.yaml
+                EOF
 
   tags = {
     Name = "k3s"
@@ -63,10 +94,11 @@ resource "aws_instance" "k3s" {
 }
 
 resource "aws_instance" "jenkins" {
-  ami           = var.ubuntu_ami
-  instance_type = "t2.micro" 
-  subnet_id     = aws_subnet.public_subnet.id
+  ami                    = var.ubuntu_ami
+  instance_type         = "t2.micro" 
+  subnet_id             = aws_subnet.public_subnet.id
   associate_public_ip_address = true
+  security_groups       = [aws_security_group.instance_sg.id]
 
   tags = {
     Name = "jenkins"
