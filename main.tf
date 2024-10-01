@@ -81,15 +81,76 @@ resource "aws_instance" "k3s" {
   security_groups       = [aws_security_group.instance_sg.id]
   user_data = <<-EOF
                 #!/bin/bash
+                exec > >(tee /var/log/user-data.log) 2>&1
+
                 apt update
                 apt install -y curl
+
                 curl -sfL https://get.k3s.io | sh -
                 chmod 644 /etc/rancher/k3s/k3s.yaml
                 chown ubuntu:ubuntu /etc/rancher/k3s/k3s.yaml
+
+                curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+                chmod 700 get_helm.sh
+                ./get_helm.sh
+
+                # Set KUBECONFIG environment variable for the current session
+                export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+                # Add KUBECONFIG export to the user's bashrc for future sessions
+                echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /home/ubuntu/.bashrc
+
+                helm repo add bitnami https://charts.bitnami.com/bitnami
+                helm repo update
+                helm install nginx bitnami/nginx
+
+                sudo -u ubuntu helm repo add bitnami https://charts.bitnami.com/bitnami
+                sudo -u ubuntu helm repo update
                 EOF
 
   tags = {
     Name = "k3s"
+  }
+}
+
+resource "aws_instance" "k3sbig" {
+  ami                    = var.ubuntu_ami
+  instance_type         = "t2.small" 
+  subnet_id             = aws_subnet.public_subnet.id
+  associate_public_ip_address = true
+  security_groups       = [aws_security_group.instance_sg.id]
+  user_data = <<-EOF
+                #!/bin/bash
+                exec > >(tee /var/log/user-data.log) 2>&1
+
+                apt update
+                apt install -y curl
+
+                curl -sfL https://get.k3s.io | sh -
+                chmod 644 /etc/rancher/k3s/k3s.yaml
+                chown ubuntu:ubuntu /etc/rancher/k3s/k3s.yaml
+
+                curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+                chmod 700 get_helm.sh
+                ./get_helm.sh
+
+                # Set KUBECONFIG environment variable for the current session
+                export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+                # Add KUBECONFIG export to the user's bashrc for future sessions
+                echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /home/ubuntu/.bashrc
+
+                helm repo add bitnami https://charts.bitnami.com/bitnami
+                helm repo update
+                helm install nginx bitnami/nginx
+
+                sudo -u ubuntu helm repo add bitnami https://charts.bitnami.com/bitnami
+                sudo -u ubuntu helm repo update
+                EOF
+
+
+  tags = {
+    Name = "k3sBIG"
   }
 }
 
@@ -99,6 +160,13 @@ resource "aws_instance" "jenkins" {
   subnet_id             = aws_subnet.public_subnet.id
   associate_public_ip_address = true
   security_groups       = [aws_security_group.instance_sg.id]
+  user_data = <<-EOF
+                #!/bin/bash
+                apt update
+                apt install -y software-properties-common
+                add-apt-repository --yes --update ppa:ansible/ansible
+                apt install -y ansible
+                EOF
 
   tags = {
     Name = "jenkins"
