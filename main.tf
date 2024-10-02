@@ -10,9 +10,9 @@ resource "aws_vpc" "main_vpc" {
 }
 
 resource "aws_subnet" "public_subnet" {
-  vpc_id            = aws_vpc.main_vpc.id
-  cidr_block        = "10.0.1.0/24"
-  availability_zone = "us-east-1a"
+  vpc_id                  = aws_vpc.main_vpc.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
 
   tags = {
@@ -54,13 +54,13 @@ resource "aws_security_group" "k3s_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] 
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = "-1" 
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -76,20 +76,20 @@ resource "aws_security_group" "jenkins_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] 
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] 
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = "-1" 
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -99,16 +99,54 @@ resource "aws_security_group" "jenkins_sg" {
 }
 
 variable "ubuntu_ami" {
-  default = "ami-0e86e20dae9224db8" # Ubuntu ISO in us-east-1
+  default = "ami-0e86e20dae9224db8" # Ubuntu ISO in us-east-1 | Use Data Source Instead
 }
 
-# resource "aws_instance" "k3s" {
-#   ami                    = var.ubuntu_ami
-#   instance_type         = "t2.micro" 
-#   subnet_id             = aws_subnet.public_subnet.id
+resource "aws_instance" "k3s" {
+  ami                         = var.ubuntu_ami
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.public_subnet.id
+  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.k3s_sg.id]
+  user_data                   = <<-EOF
+                #!/bin/bash
+                exec > >(tee /var/log/user-data.log) 2>&1
+
+                apt update
+                apt install -y curl
+
+                curl -sfL https://get.k3s.io | sh -
+                chmod 644 /etc/rancher/k3s/k3s.yaml
+                chown ubuntu:ubuntu /etc/rancher/k3s/k3s.yaml
+
+                curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+                chmod 700 get_helm.sh
+                ./get_helm.sh
+
+                # Set KUBECONFIG environment variable for the current session
+                export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+                # Add KUBECONFIG export to the user's bashrc for future sessions
+                echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /home/ubuntu/.bashrc
+
+                helm repo add kubegemsapp https://charts.kubegems.io/kubegemsapp
+                helm install nginx kubegemsapp/nginx --version 9.3.4 --namespace nginx --create-namespace --set resources.limits.cpu=500m --set resources.limits.memory=500Mi --set resources.requests.cpu=100m --set resources.requests.memory=128Mi
+
+                sudo -u ubuntu helm repo add kubegemsapp https://charts.kubegems.io/kubegemsapp
+                EOF
+
+  tags = {
+    Name = "k3s"
+  }
+}
+
+# resource "aws_instance" "k3sbig" {
+#   ami                         = var.ubuntu_ami
+#   instance_type               = "t2.small"
+#   subnet_id                   = aws_subnet.public_subnet.id
 #   associate_public_ip_address = true
-#   security_groups       = [aws_security_group.k3s_sg.id]
-#   user_data = <<-EOF
+#   vpc_security_group_ids      = [aws_security_group.k3s_sg.id]
+#   user_data                   = <<-EOF
 #                 #!/bin/bash
 #                 exec > >(tee /var/log/user-data.log) 2>&1
 
@@ -137,59 +175,19 @@ variable "ubuntu_ami" {
 #                 sudo -u ubuntu helm repo update
 #                 EOF
 
+
 #   tags = {
-#     Name = "k3s"
+#     Name = "k3sBIG"
 #   }
 # }
 
-resource "aws_instance" "k3sbig" {
-  ami                    = var.ubuntu_ami
-  instance_type         = "t2.small" 
-  subnet_id             = aws_subnet.public_subnet.id
-  associate_public_ip_address = true
-  security_groups       = [aws_security_group.k3s_sg.id]
-  user_data = <<-EOF
-                #!/bin/bash
-                exec > >(tee /var/log/user-data.log) 2>&1
-
-                apt update
-                apt install -y curl
-
-                curl -sfL https://get.k3s.io | sh -
-                chmod 644 /etc/rancher/k3s/k3s.yaml
-                chown ubuntu:ubuntu /etc/rancher/k3s/k3s.yaml
-
-                curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-                chmod 700 get_helm.sh
-                ./get_helm.sh
-
-                # Set KUBECONFIG environment variable for the current session
-                export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-
-                # Add KUBECONFIG export to the user's bashrc for future sessions
-                echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /home/ubuntu/.bashrc
-
-                helm repo add bitnami https://charts.bitnami.com/bitnami
-                helm repo update
-                helm install nginx bitnami/nginx
-
-                sudo -u ubuntu helm repo add bitnami https://charts.bitnami.com/bitnami
-                sudo -u ubuntu helm repo update
-                EOF
-
-
-  tags = {
-    Name = "k3sBIG"
-  }
-}
-
 resource "aws_instance" "jenkins" {
-  ami                    = var.ubuntu_ami
-  instance_type         = "t2.micro" 
-  subnet_id             = aws_subnet.public_subnet.id
+  ami                         = var.ubuntu_ami
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.public_subnet.id
   associate_public_ip_address = true
-  security_groups       = [aws_security_group.jenkins_sg.id]
-  user_data = <<-EOF
+  vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
+  user_data                   = <<-EOF
               #!/bin/bash
               exec > >(tee /var/log/user-data.log) 2>&1
 
@@ -215,8 +213,8 @@ resource "aws_instance" "jenkins" {
 }
 
 resource "aws_ecr_repository" "my_repository" {
-  name                 = "kady-docker-repo" 
-  image_tag_mutability = "MUTABLE"        
+  name                 = "kady-docker-repo"
+  image_tag_mutability = "MUTABLE"
 
   tags = {
     Name = "kady-ecr-repo"
