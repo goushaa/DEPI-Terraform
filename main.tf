@@ -57,6 +57,13 @@ resource "aws_security_group" "k3s_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -130,7 +137,7 @@ resource "aws_instance" "k3s" {
                 echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /home/ubuntu/.bashrc
 
                 helm repo add kubegemsapp https://charts.kubegems.io/kubegemsapp
-                helm install nginx kubegemsapp/nginx --version 9.3.4 --namespace nginx --create-namespace --set resources.limits.cpu=500m --set resources.limits.memory=500Mi --set resources.requests.cpu=100m --set resources.requests.memory=128Mi
+                helm install nginx kubegemsapp/nginx --version 9.3.4 --namespace nginx --create-namespace --set resources.limits.cpu=500m,resources.limits.memory=500Mi,resources.requests.cpu=100m,resources.requests.memory=128Mi,service.type=NodePort,service.nodePort=80
 
                 sudo -u ubuntu helm repo add kubegemsapp https://charts.kubegems.io/kubegemsapp
                 EOF
@@ -194,6 +201,7 @@ resource "aws_instance" "jenkins" {
               # Update package lists and install necessary packages
               apt update
               apt install -y curl software-properties-common
+              apt install -y python3
 
               # Add Ansible PPA and install Ansible
               add-apt-repository --yes --update ppa:ansible/ansible
