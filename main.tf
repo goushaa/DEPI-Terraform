@@ -205,6 +205,7 @@ resource "aws_instance" "jenkins" {
 
               # Add ubuntu user to the docker group
               usermod -aG docker ubuntu
+              newgrp docker
               EOF
 
   tags = {
