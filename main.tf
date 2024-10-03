@@ -58,8 +58,8 @@ resource "aws_security_group" "k3s_sg" {
   }
 
   ingress {
-    from_port   = 80
-    to_port     = 80
+    from_port   = 30000
+    to_port     = 30000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -137,7 +137,7 @@ resource "aws_instance" "k3s" {
                 echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /home/ubuntu/.bashrc
 
                 helm repo add kubegemsapp https://charts.kubegems.io/kubegemsapp
-                helm install nginx kubegemsapp/nginx --version 9.3.4 --namespace nginx --create-namespace --set resources.limits.cpu=500m,resources.limits.memory=500Mi,resources.requests.cpu=100m,resources.requests.memory=128Mi,service.type=NodePort,service.nodePort=80
+                helm install nginx kubegemsapp/nginx --version 9.3.4 --namespace nginx --create-namespace --set resources.limits.cpu=500m,resources.limits.memory=500Mi,resources.requests.cpu=100m,resources.requests.memory=128Mi,service.nodePorts.http=30000
 
                 sudo -u ubuntu helm repo add kubegemsapp https://charts.kubegems.io/kubegemsapp
                 EOF
@@ -146,6 +146,52 @@ resource "aws_instance" "k3s" {
     Name = "k3s"
   }
 }
+
+
+
+resource "aws_instance" "jenkins" {
+  ami                         = var.ubuntu_ami
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.public_subnet.id
+  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
+  user_data                   = <<-EOF
+              #!/bin/bash
+              exec > >(tee /var/log/user-data.log) 2>&1
+
+              # Update package lists and install necessary packages
+              apt update
+              apt install -y curl software-properties-common
+
+              # Add Ansible PPA and install Ansible
+              add-apt-repository --yes --update ppa:ansible/ansible
+              apt install -y ansible
+
+              # Download the Ansible playbook for Docker and Jenkins installation
+              groupadd docker
+              usermod -aG docker ubuntu
+              newgrp docker
+
+              ansible-galaxy install iam-surya369.java-jenkins-docker
+              curl -O https://raw.githubusercontent.com/goushaa/DEPI-Ansible/refs/heads/main/role_docker_jenkins.yaml
+              ansible-playbook role_docker_jenkins.yaml
+              EOF
+
+  tags = {
+    Name = "jenkins"
+  }
+}
+
+resource "aws_ecr_repository" "my_repository" {
+  name                 = "kady-docker-repo"
+  image_tag_mutability = "MUTABLE"
+
+  tags = {
+    Name = "kady-ecr-repo"
+  }
+}
+
+## Another way to deploy k3s, but needs t2.small instance which is not in the free tier
 
 # resource "aws_instance" "k3sbig" {
 #   ami                         = var.ubuntu_ami
@@ -187,45 +233,3 @@ resource "aws_instance" "k3s" {
 #     Name = "k3sBIG"
 #   }
 # }
-
-resource "aws_instance" "jenkins" {
-  ami                         = var.ubuntu_ami
-  instance_type               = "t2.micro"
-  subnet_id                   = aws_subnet.public_subnet.id
-  associate_public_ip_address = true
-  vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
-  user_data                   = <<-EOF
-              #!/bin/bash
-              exec > >(tee /var/log/user-data.log) 2>&1
-
-              # Update package lists and install necessary packages
-              apt update
-              apt install -y curl software-properties-common
-              apt install -y python3
-
-              # Add Ansible PPA and install Ansible
-              add-apt-repository --yes --update ppa:ansible/ansible
-              apt install -y ansible
-
-              # Download the Ansible playbook for Docker and Jenkins installation
-              curl -O https://raw.githubusercontent.com/goushaa/DEPI-Ansible/refs/heads/main/install_docker_jenkins.yaml
-              ansible-playbook install_docker_jenkins.yaml
-
-              # Add ubuntu user to the docker group
-              usermod -aG docker ubuntu
-              newgrp docker
-              EOF
-
-  tags = {
-    Name = "jenkins"
-  }
-}
-
-resource "aws_ecr_repository" "my_repository" {
-  name                 = "kady-docker-repo"
-  image_tag_mutability = "MUTABLE"
-
-  tags = {
-    Name = "kady-ecr-repo"
-  }
-}
