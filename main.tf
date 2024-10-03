@@ -121,10 +121,15 @@ resource "aws_instance" "k3s" {
 
                 apt update
                 apt install -y curl
+                apt install -y unzip
 
                 curl -sfL https://get.k3s.io | sh -
                 chmod 644 /etc/rancher/k3s/k3s.yaml
                 chown ubuntu:ubuntu /etc/rancher/k3s/k3s.yaml
+
+                curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                unzip awscliv2.zip
+                ./aws/install
 
                 curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
                 chmod 700 get_helm.sh
