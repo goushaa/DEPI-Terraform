@@ -192,7 +192,6 @@ resource "aws_ecr_repository" "my_repository" {
 }
 
 ## Another way to deploy k3s, but needs t2.small instance which is not in the free tier
-
 # resource "aws_instance" "k3sbig" {
 #   ami                         = var.ubuntu_ami
 #   instance_type               = "t2.small"
