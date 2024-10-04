@@ -115,21 +115,17 @@ resource "aws_instance" "k3s" {
   subnet_id                   = aws_subnet.public_subnet.id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.k3s_sg.id]
+  key_name                    = "k3sPair.pem"
   user_data                   = <<-EOF
                 #!/bin/bash
                 exec > >(tee /var/log/user-data.log) 2>&1
 
                 apt update
                 apt install -y curl
-                apt install -y unzip
 
                 curl -sfL https://get.k3s.io | sh -
                 chmod 644 /etc/rancher/k3s/k3s.yaml
                 chown ubuntu:ubuntu /etc/rancher/k3s/k3s.yaml
-
-                curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                unzip awscliv2.zip
-                ./aws/install
 
                 curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
                 chmod 700 get_helm.sh
@@ -166,15 +162,21 @@ resource "aws_instance" "jenkins" {
 
               # Update package lists and install necessary packages
               apt update
-              apt install -y curl software-properties-common
+              apt install -y curl software-properties-common unzip
 
               # Add Ansible PPA and install Ansible
               add-apt-repository --yes --update ppa:ansible/ansible
               apt install -y ansible
 
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip awscliv2.zip
+              ./aws/install
+
               # Download the Ansible playbook for Docker and Jenkins installation
               groupadd docker
               usermod -aG docker ubuntu
+              groupadd jenkins
+              usermod -aG docker jenkins
               newgrp docker
 
               ansible-galaxy install iam-surya369.java-jenkins-docker
