@@ -105,6 +105,55 @@ resource "aws_security_group" "jenkins_sg" {
   }
 }
 
+resource "aws_iam_role" "jenkins_role" {
+  name = "JenkinsRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "jenkins_policy" {
+  name        = "JenkinsPolicy"
+  description = "Policy for Jenkins to access EC2 and ECR"
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+
+resource "aws_iam_policy_attachment" "jenkins_policy_attachment" {
+  name       = "jenkins-policy-attachment"
+  roles      = [aws_iam_role.jenkins_role.name]
+  policy_arn = aws_iam_policy.jenkins_policy.arn
+}
+
+resource "aws_iam_instance_profile" "jenkins_instance_profile" {
+  name = "JenkinsInstanceProfile"
+  role = aws_iam_role.jenkins_role.name
+}
+
+
+
 variable "ubuntu_ami" {
   default = "ami-0e86e20dae9224db8" # Ubuntu ISO in us-east-1 | Use Data Source Instead
 }
@@ -115,7 +164,7 @@ resource "aws_instance" "k3s" {
   subnet_id                   = aws_subnet.public_subnet.id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.k3s_sg.id]
-  key_name                    = "k3sPair.pem"
+  key_name                    = "k3sPair"
   user_data                   = <<-EOF
                 #!/bin/bash
                 exec > >(tee /var/log/user-data.log) 2>&1
@@ -148,14 +197,13 @@ resource "aws_instance" "k3s" {
   }
 }
 
-
-
 resource "aws_instance" "jenkins" {
   ami                         = var.ubuntu_ami
   instance_type               = "t2.micro"
   subnet_id                   = aws_subnet.public_subnet.id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.jenkins_instance_profile.name  
   user_data                   = <<-EOF
               #!/bin/bash
               exec > >(tee /var/log/user-data.log) 2>&1
@@ -175,13 +223,14 @@ resource "aws_instance" "jenkins" {
               # Download the Ansible playbook for Docker and Jenkins installation
               groupadd docker
               usermod -aG docker ubuntu
-              groupadd jenkins
-              usermod -aG docker jenkins
               newgrp docker
 
               ansible-galaxy install iam-surya369.java-jenkins-docker
               curl -O https://raw.githubusercontent.com/goushaa/DEPI-Ansible/refs/heads/main/role_docker_jenkins.yaml
               ansible-playbook role_docker_jenkins.yaml
+
+              usermod -aG docker jenkins
+              systemctl restart jenkins
               EOF
 
   tags = {
