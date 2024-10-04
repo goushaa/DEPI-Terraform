@@ -14,16 +14,24 @@ This repository contains Terraform code to set up an AWS infrastructure that inc
 
 ## Infrastructure Overview
 
-The following AWS resources are created:
+The following AWS resources are created using Terraform:
 
+- A provider configuration for AWS in the `us-east-1` region.
 - A VPC (`kady-vpc`) with a CIDR block of `10.0.0.0/16`.
-- A public subnet (`kady-public-subnet`) within the VPC.
-- An Internet Gateway (`kady-internet-gateway`) to allow Internet access.
-- A route table for public routing (`kady-public-route-table`) associated with the public subnet.
+- A public subnet (`kady-public-subnet`) with a CIDR block of `10.0.1.0/24`, in availability zone `us-east-1a`, and with public IP assignment on launch.
+- An Internet Gateway (`kady-internet-gateway`) for Internet access.
+- A public route table (`kady-public-route-table`) with a route for all traffic (`0.0.0.0/0`) via the Internet Gateway.
+- Two security groups:
+  - `k3s-sg`: Allows SSH (port 22) and Kubernetes HTTP (port 30000) access.
+  - `jenkins-sg`: Allows SSH (port 22) and Jenkins HTTP (port 8080) access.
+- IAM roles and policies:
+  - `k3s` IAM role: Allows EC2 and ECR access for Kubernetes operations.
+  - `jenkins` IAM role: Allows EC2 and ECR access for Jenkins.
+  - Instance profiles assigned to EC2 instances for role-based permissions.
 - Two EC2 instances:
-  - `k3s`: A Kubernetes lightweight instance.
-  - `jenkins`: An instance for Jenkins.
-- An Amazon ECR repository (`kady-docker-repo`) for storing Docker images.
+  - `k3s` (t2.micro): Runs k3s (Kubernetes), with Helm and Nginx installed via user data.
+  - `jenkins` (t2.micro): Runs Jenkins, with Docker and Ansible installed via user data.
+- An Amazon ECR repository (`kady-docker-repo`) for storing Docker images for the project.
 
 ## Deployment Steps
 
