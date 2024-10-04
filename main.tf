@@ -105,6 +105,56 @@ resource "aws_security_group" "jenkins_sg" {
   }
 }
 
+resource "aws_iam_role" "k3s_role" {
+  name = "K3sRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "k3s_policy" {
+  name        = "K3sPolicy"
+  description = "Policy for K3s to access ECR and EC2"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy_attachment" "k3s_policy_attachment" {
+  name       = "k3s-policy-attachment"
+  roles      = [aws_iam_role.k3s_role.name]
+  policy_arn = aws_iam_policy.k3s_policy.arn
+}
+
+resource "aws_iam_instance_profile" "k3s_instance_profile" {
+  name = "K3sInstanceProfile"
+  role = aws_iam_role.k3s_role.name
+}
+
+
 resource "aws_iam_role" "jenkins_role" {
   name = "JenkinsRole"
 
@@ -165,12 +215,18 @@ resource "aws_instance" "k3s" {
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.k3s_sg.id]
   key_name                    = "k3sPair"
+  iam_instance_profile        = aws_iam_instance_profile.k3s_instance_profile.name
+
   user_data                   = <<-EOF
                 #!/bin/bash
                 exec > >(tee /var/log/user-data.log) 2>&1
 
                 apt update
-                apt install -y curl
+                apt install -y curl unzip
+
+                curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                unzip awscliv2.zip
+                ./aws/install
 
                 curl -sfL https://get.k3s.io | sh -
                 chmod 644 /etc/rancher/k3s/k3s.yaml
@@ -188,6 +244,8 @@ resource "aws_instance" "k3s" {
 
                 helm repo add kubegemsapp https://charts.kubegems.io/kubegemsapp
                 helm install nginx kubegemsapp/nginx --version 9.3.4 --namespace nginx --create-namespace --set resources.limits.cpu=500m,resources.limits.memory=500Mi,resources.requests.cpu=100m,resources.requests.memory=128Mi,service.nodePorts.http=30000
+                
+                kubectl create secret docker-registry ecr-secret --docker-server=522814709442.dkr.ecr.us-east-1.amazonaws.com --docker-username=AWS --docker-password=$(aws ecr get-login-password --region us-east-1) --docker-email=your-email@example.com
 
                 sudo -u ubuntu helm repo add kubegemsapp https://charts.kubegems.io/kubegemsapp
                 EOF
