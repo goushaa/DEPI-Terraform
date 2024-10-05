@@ -2,7 +2,7 @@
 
 This repository contains Terraform code to set up an AWS infrastructure, including a VPC, a public subnet, an Internet Gateway, and EC2 instances for k3s (Kubernetes) and Jenkins. It also provisions security groups, IAM roles, and an Amazon ECR repository for managing Docker images.
 
-![AWS Infrastructure Diagram](Project Architecture.png)
+![AWS Infrastructure Diagram](Project%20Architecture.png)
 
 ## Prerequisites
 
