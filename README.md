@@ -1,6 +1,8 @@
 # Terraform AWS Infrastructure
 
-This repository contains Terraform code to set up an AWS infrastructure that includes a VPC, a public subnet, an Internet Gateway, and EC2 instances running Ubuntu. It also includes an Amazon ECR repository for Docker images.
+This repository contains Terraform code to set up an AWS infrastructure, including a VPC, a public subnet, an Internet Gateway, and EC2 instances for k3s (Kubernetes) and Jenkins. It also provisions security groups, IAM roles, and an Amazon ECR repository for managing Docker images.
+
+![AWS Infrastructure Diagram](Project Architecture.png)
 
 ## Prerequisites
 
