@@ -208,8 +208,23 @@ variable "ubuntu_ami" {
   default = "ami-0e86e20dae9224db8" # Ubuntu ISO in us-east-1 | Use Data Source Instead
 }
 
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical's AWS account ID for official Ubuntu AMIs
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 resource "aws_instance" "k3s" {
-  ami                         = var.ubuntu_ami
+  ami                         = var.ubuntu_ami #data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   subnet_id                   = aws_subnet.public_subnet.id
   associate_public_ip_address = true
