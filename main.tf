@@ -271,7 +271,7 @@ resource "aws_instance" "k3s" {
 }
 
 resource "aws_instance" "jenkins" {
-  ami                         = var.ubuntu_ami
+  ami                         = var.ubuntu_ami #data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   subnet_id                   = aws_subnet.public_subnet.id
   associate_public_ip_address = true
