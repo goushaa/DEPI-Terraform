@@ -208,6 +208,7 @@ variable "ubuntu_ami" {
   default = "ami-0e86e20dae9224db8" # Ubuntu ISO in us-east-1 | Use Data Source Instead
 }
 
+# another solution instead of embedding the ami directly
 # data "aws_ami" "ubuntu" {
 #   most_recent = true
 #   owners      = ["099720109477"] # Canonical's AWS account ID for official Ubuntu AMIs
